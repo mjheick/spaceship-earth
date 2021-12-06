@@ -28,6 +28,7 @@ renderer.setClearColor(0x0, 0.5);
 
 let jq = new XMLHttpRequest();
 let lights = []; /* an array of all PointLight objects https://threejs.org/docs/#api/en/lights/PointLight */
+let lights_to_render = 100; /* for some reason we have to cap this */
 jq.onreadystatechange = function() {
 	if ((jq.readyState == 4) && (jq.status == 200)) {
 		let lightmaps = JSON.parse(jq.responseText);
@@ -37,13 +38,15 @@ jq.onreadystatechange = function() {
 		}
 		let lightdef = null;
 		for (let l = 0; l < lightmaps.lights.length; l++) {
-			lightdef = new THREE.PointLight( 0xffff00, 1, 100 ); /* Math.floor(Math.random(16777215)) */
+			let clr = new THREE.Color(Math.random(),Math.random(),Math.random());
+			lightdef = new THREE.PointLight( clr, 0.75, 50 ); /* Math.floor(Math.random(16777215)) */
 			lightdef.position.set( lightmaps.lights[l][0], lightmaps.lights[l][1], lightmaps.lights[l][2] );
 			lights.push(lightdef);
+			clr = null;
 			lightdef = null; /* Reassign, cause we be nice */
 		}
 		/* Get all the lights displayed */
-		for (let l = 0; l < 50; l++) {
+		for (let l = 0; l < lights_to_render; l++) {
 			scene.add(lights[l]);
 		}
 	}
@@ -79,18 +82,29 @@ loader.load('spaceship-earth.obj',
 		/* console.log( 'An error happened' ); */
 	}
 );
-
+function bound360(angle) {
+	while (angle > 360) { angle -= 360; }
+	while (angle < 0) { angle += 360; }
+	return angle;
+}
 /* controls to rotate our shape */
 /* Add mouse events */
 let mouseX, mouseY;
 function onDocumentMouseMove( event ) {
 	mouseX = event.clientX / 100;
+	mouseY = event.clientY / 100;
+	let rotationX = bound360(mouseX);
+	let callRender = false;
 	//mouseY = event.clientY / 2;
 	if ((typeof spaceship_earth_object === 'object') && (typeof spaceship_earth_texture === 'object')) {
-		spaceship_earth_object.rotation.y += ( mouseX - spaceship_earth_object.rotation.y ) / 100;
-		//camera.position.z += (mouseY - camera.position.z);
-		//console.log(spaceship_earth_object.rotation.z);
-		//camera.lookAt( scene.position );
+		spaceship_earth_object.rotation.y = rotationX;
+		callRender = true;
+	}
+	for (let l = 0; l < lights_to_render; l++) {
+		lights[l].rotation.y = rotationX;
+		callRender = true;
+	}
+	if (callRender) {
 		masterRenderer();
 	}
 }
