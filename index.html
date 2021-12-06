@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Spaceship Earth / Epcot in WebGL</title>
+	</head>
+	<style>
+body { margin: 0; }
+	</style>
+	<body>
+		<script src="./three.js@0.135.0/build/three.js"></script>
+		<script src="./three.js@0.135.0/examples/js/loaders/OBJLoader.js"></script>
+		<script>
+/* The Scene */
+let scene = new THREE.Scene();
+
+/* Camera */
+let camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 10000 );
+camera.position.z = 55;
+
+/* Renderer is the entire window */
+let renderer = new THREE.WebGLRenderer();
+renderer.setSize( window.innerWidth, window.innerHeight );
+document.body.appendChild( renderer.domElement );
+renderer.setClearColor(0x0, 0.5);
+
+/* White ambient light exists everywhere */
+//let ambient_white = new THREE.AmbientLight(); scene.add(ambient_white);
+
+let jq = new XMLHttpRequest();
+let lights = []; /* an array of all PointLight objects https://threejs.org/docs/#api/en/lights/PointLight */
+jq.onreadystatechange = function() {
+	if ((jq.readyState == 4) && (jq.status == 200)) {
+		let lightmaps = JSON.parse(jq.responseText);
+		if (!lightmaps.hasOwnProperty('lights')) {
+			console.log('something wrong with the lights...');
+			return;
+		}
+		let lightdef = null;
+		for (let l = 0; l < lightmaps.lights.length; l++) {
+			lightdef = new THREE.PointLight( 0xffff00, 1, 100 ); /* Math.floor(Math.random(16777215)) */
+			lightdef.position.set( lightmaps.lights[l][0], lightmaps.lights[l][1], lightmaps.lights[l][2] );
+			lights.push(lightdef);
+			lightdef = null; /* Reassign, cause we be nice */
+		}
+		/* Get all the lights displayed */
+		for (let l = 0; l < 50; l++) {
+			scene.add(lights[l]);
+		}
+	}
+};
+jq.open('GET', './lightpoints.json', true);
+jq.send(null);
+
+/* Load the obj and texture */
+let loader = new THREE.OBJLoader();
+let spaceship_earth_object = null;
+let texture_loader = new THREE.ImageLoader();
+let spaceship_earth_texture = null;
+loader.load('spaceship-earth.obj', 
+	function ( object ) { /* When loaded */
+		spaceship_earth_object = object;
+		texture_loader.load('./silver_64x64.png', function(object) {
+			spaceship_earth_texture = new THREE.Texture();
+			spaceship_earth_texture.image = object;
+			spaceship_earth_texture.needsUpdate = true;
+			spaceship_earth_object.traverse(
+				function(child) {
+					if (child instanceof THREE.Mesh) {
+						child.material.map = spaceship_earth_texture;
+					}
+				}
+			);
+		});
+		scene.add( spaceship_earth_object );
+		masterRenderer();
+	}, function ( xhr ) { /* While downloading file */
+		/* console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' ); */
+	}, function ( error ) { /* An error happens */
+		/* console.log( 'An error happened' ); */
+	}
+);
+
+/* controls to rotate our shape */
+/* Add mouse events */
+let mouseX, mouseY;
+function onDocumentMouseMove( event ) {
+	mouseX = event.clientX / 100;
+	//mouseY = event.clientY / 2;
+	if ((typeof spaceship_earth_object === 'object') && (typeof spaceship_earth_texture === 'object')) {
+		spaceship_earth_object.rotation.y += ( mouseX - spaceship_earth_object.rotation.y ) / 100;
+		//camera.position.z += (mouseY - camera.position.z);
+		//console.log(spaceship_earth_object.rotation.z);
+		//camera.lookAt( scene.position );
+		masterRenderer();
+	}
+}
+document.addEventListener('mousemove', onDocumentMouseMove, false );
+
+/* Our render routine */
+function masterRenderer() {
+	/* if we have our mesh and our texture loaded, render it out */
+	if ((typeof spaceship_earth_object === 'object') && (typeof spaceship_earth_texture === 'object')) {
+		renderer.render(scene, camera);
+	}
+}
+
+		</script>
+	</body>
+</html>
