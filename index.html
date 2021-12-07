@@ -15,7 +15,10 @@ let scene = new THREE.Scene();
 
 /* Camera */
 let camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 10000 );
-camera.position.z = 55;
+let camera_distance = 42; /* How far are we dancing around this? */
+camera.position.x = 0;
+camera.position.y = 0;
+camera.position.z = camera_distance;
 
 /* Renderer is the entire window */
 let renderer = new THREE.WebGLRenderer();
@@ -27,8 +30,8 @@ renderer.setClearColor(0x0, 0.5);
 //let ambient_white = new THREE.AmbientLight(); scene.add(ambient_white);
 
 let jq = new XMLHttpRequest();
-let lights = []; /* an array of all PointLight objects https://threejs.org/docs/#api/en/lights/PointLight */
-let lights_to_render = 100; /* for some reason we have to cap this */
+let lights = []; /* an array of all PointLight objects  */
+let lights_to_render = 251; /* for some reason we have to cap this */
 jq.onreadystatechange = function() {
 	if ((jq.readyState == 4) && (jq.status == 200)) {
 		let lightmaps = JSON.parse(jq.responseText);
@@ -38,8 +41,12 @@ jq.onreadystatechange = function() {
 		}
 		let lightdef = null;
 		for (let l = 0; l < lightmaps.lights.length; l++) {
-			let clr = new THREE.Color(Math.random(),Math.random(),Math.random());
-			lightdef = new THREE.PointLight( clr, 0.75, 50 ); /* Math.floor(Math.random(16777215)) */
+			let clr = new THREE.Color(Math.random(), Math.random(), Math.random());
+			lightdef = new THREE.PointLight( clr, 0.75, 10 ); /* color, intensity, distance | https://threejs.org/docs/#api/en/lights/PointLight */
+			lightdef.add(new THREE.Mesh(
+				new THREE.SphereGeometry( 0.1, 16, 8 ), /* radius, widthSegments, heightSegments | https://threejs.org/docs/#api/en/geometries/SphereGeometry */
+				new THREE.MeshBasicMaterial( { color: clr } )
+			));
 			lightdef.position.set( lightmaps.lights[l][0], lightmaps.lights[l][1], lightmaps.lights[l][2] );
 			lights.push(lightdef);
 			clr = null;
@@ -74,6 +81,10 @@ loader.load('spaceship-earth.obj',
 				}
 			);
 		});
+		/* Make sure we're on the origin */
+		spaceship_earth_object.position.x = 0;
+		spaceship_earth_object.position.y = 0;
+		spaceship_earth_object.position.z = 0;
 		scene.add( spaceship_earth_object );
 		masterRenderer();
 	}, function ( xhr ) { /* While downloading file */
@@ -90,23 +101,16 @@ function bound360(angle) {
 /* controls to rotate our shape */
 /* Add mouse events */
 let mouseX, mouseY;
+let deg2rad = 3.14159 / 180;
 function onDocumentMouseMove( event ) {
-	mouseX = event.clientX / 100;
-	mouseY = event.clientY / 100;
-	let rotationX = bound360(mouseX);
-	let callRender = false;
-	//mouseY = event.clientY / 2;
-	if ((typeof spaceship_earth_object === 'object') && (typeof spaceship_earth_texture === 'object')) {
-		spaceship_earth_object.rotation.y = rotationX;
-		callRender = true;
-	}
-	for (let l = 0; l < lights_to_render; l++) {
-		lights[l].rotation.y = rotationX;
-		callRender = true;
-	}
-	if (callRender) {
-		masterRenderer();
-	}
+	mouseX = event.clientX;
+	/* mouseY = event.clientY / 100; */
+	let rotationX = bound360(mouseX) * deg2rad;
+	/* Lets move the camera around our origin */
+	camera.position.x = Math.sin(rotationX) * camera_distance;
+	camera.position.z = Math.cos(rotationX) * camera_distance;
+	camera.lookAt(0, 0, 0);
+	masterRenderer();
 }
 document.addEventListener('mousemove', onDocumentMouseMove, false );
 
@@ -117,6 +121,15 @@ function masterRenderer() {
 		renderer.render(scene, camera);
 	}
 }
+
+/* Make sure viewport gets updated when we change the window size */
+function onWindowResize() {
+	camera.aspect = window.innerWidth / window.innerHeight;
+	camera.updateProjectionMatrix();
+	renderer.setSize( window.innerWidth, window.innerHeight );
+	masterRenderer();
+}
+window.addEventListener('resize', onWindowResize);
 
 		</script>
 	</body>
